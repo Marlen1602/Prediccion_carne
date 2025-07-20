@@ -1,34 +1,46 @@
-from flask import Flask, request, jsonify, render_template
-from flask_cors import CORS
+from flask import Flask, jsonify
+import pandas as pd
 import joblib
-import numpy as np
+from sqlalchemy import create_engine
 
 app = Flask(__name__)
-CORS(app)
 
-# Cargar el modelo entrenado
-modelo = joblib.load('modelo_consumo_carne.pkl')
+# Configura tu conexión a la base de datos
+engine = create_engine('mysql+pymysql://marlenhe_Marlen:Marlen1602@mx32.hostgator.mx:3306/marlenhe_smokeygrill')
 
-@app.route('/')
-def home():
-    return render_template('index.html')  # Si tienes HTML, si no puedes quitar esta línea
 
-@app.route('/api/prediccion-carne', methods=['POST'])
+@app.route('/api/prediccion-carne', methods=['GET'])
 def predecir_carne():
     try:
-        data = request.get_json()
-        campos = ['hamburguesas', 'tacos', 'bolillos', 'burritos', 'gringas', 'baguettes']
-        
-        if not all(c in data for c in campos):
-            return jsonify({'error': 'Faltan campos'}), 400
+        # 1. Consultar las últimas 4 semanas
+        query = """
+        SELECT hamburguesas, tacos, bolillos, burritos, gringas, baguettes
+        FROM ventas_semanales
+        ORDER BY end_date DESC
+        LIMIT 4
+        """
+        ultimas_4 = pd.read_sql(query, engine)
+        ultimas_4 = ultimas_4[::-1]  # Orden cronológico
 
-        entrada = np.array([[data[c] for c in campos]])
-        prediccion = modelo.predict(entrada)[0]
+        # 2. Calcular promedio
+        features = ['hamburguesas', 'tacos', 'bolillos', 'burritos', 'gringas', 'baguettes']
+        promedios = ultimas_4[features].mean().values.reshape(1, -1)
+        df_promedios = pd.DataFrame(promedios, columns=features)
 
-        return jsonify({'prediccion_carne_kg': round(prediccion, 2)})
+        # 3. Cargar modelo
+        modelo = joblib.load('modelo_consumo_carne.pkl')
+
+        # 4. Predecir
+        prediccion = modelo.predict(df_promedios)[0]
+
+        return jsonify({
+            "mensaje": "Predicción realizada con éxito",
+            "carne_estimacion_kg": round(prediccion, 2)
+        })
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
+# Si ejecutas directamente
 if __name__ == '__main__':
     app.run(debug=True)
