@@ -2,9 +2,10 @@ from flask import Flask, jsonify
 import pandas as pd
 import joblib
 from sqlalchemy import create_engine
+from flask_cors import CORS 
 
 app = Flask(__name__)
-
+CORS(app)
 # Configura tu conexión a la base de datos
 engine = create_engine('mysql+pymysql://marlenhe_Marlen:Marlen1602@mx32.hostgator.mx:3306/marlenhe_smokeygrill')
 

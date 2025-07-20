@@ -7,3 +7,4 @@ flask-cors
 sqlalchemy
 pandas
 pymysql 
+flask-cors
